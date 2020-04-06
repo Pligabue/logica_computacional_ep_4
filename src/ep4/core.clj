@@ -3,28 +3,40 @@
 
 (require '[clojure.string :as string])
 
-(defn is-upper-case [word]
-  (and (= (string/upper-case word) word) (not (string/blank? word))))
+(comment "Funções auxiliares")
+
+(defn terminal? [sample]
+  (boolean (re-matches #"[a-z]" sample)))
+
+(defn non-terminal? [sample]
+  (boolean (re-matches #"[^a-z]" sample)))
+
+(defn two-non-terminals? [sample]
+  (boolean (re-matches #"[^a-z]{2}" sample)))
+
+(comment "Funções para verificar se a Forma Normal de Chomsky está correta")
 
 (defn verify-chomsky-normal-form-rule [rule starting-char]
   (let [left-side (first rule) 
         left-size (count left-side) 
         right-side (second rule) 
         right-size (count right-side)]
-    (if (or (not= left-size 1) (not (is-upper-case left-side))) 
+    (if (or (not= left-size 1) (terminal? left-side))
       (throw (Exception. "Not a context-free language"))
       (case right-size
         0 (if (= left-side starting-char) true false)
-        1 (if (is-upper-case right-side) false true )
+        1 (if (non-terminal? right-side) false true )
         2 (if (and 
-               (is-upper-case (subs right-side 0 1))
-               (is-upper-case (subs right-side 1 2))
+               (non-terminal? (subs right-side 0 1))
+               (non-terminal? (subs right-side 1 2))
                (not= starting-char (subs right-side 0 1))
                (not= starting-char (subs right-side 1 2)))
             true
             false)
         false))))
 
+(defn rules-follow-CNF? [rules]
+  (boolean (some true? (map (fn [rule] (verify-chomsky-normal-form-rule rule "$")) rules))))
 
 (comment "Assumindo que caracteres não terminais são letras maiúsculas e terminais são letras minúsculas")
 
@@ -55,8 +67,8 @@
          non-terminal (generate-latin-non-terminal current-char)]
      (cond
        (string/blank? current-char) (conj acc rule)
-       (is-upper-case current-char) (recur rule (inc i) acc)
-       (not (is-upper-case current-char)) (recur [left-side (string/replace right-side current-char non-terminal)] (inc i) (conj acc [non-terminal current-char]))
+       (non-terminal? current-char) (recur rule (inc i) acc)
+       (terminal? current-char) (recur [left-side (string/replace right-side current-char non-terminal)] (inc i) (conj acc [non-terminal current-char]))
        :else false))))
 
 (defn TERM [rules]
@@ -164,11 +176,8 @@
 
 (comment "Funções para a transformação UNIT")
 
-(defn is-non-terminal [sample]
-  (boolean (re-matches #"[^a-z]" sample)))
-
 (defn is-unit-rule [rule]
-  (and (= 1 (count (second rule))) (is-non-terminal (second rule))))
+  (and (= 1 (count (second rule))) (non-terminal? (second rule))))
 
 (defn get-unit-transformations [main-rule rules]
   (vec (remove nil? 
@@ -186,8 +195,110 @@
                            [rule]))
                        rules))))
 
-(UNIT 
- (DEL 
-  (BIN 
-   (TERM 
-    (START [["S" "aSb"] ["S" ""]] "S")))))
+(comment "Função para a transformação total")
+
+(defn FULL [rules starting-char]
+  (UNIT 
+   (DEL 
+    (BIN 
+     (TERM 
+      (START rules starting-char))))))
+
+(comment "Funções para a algoritmo CYK")
+
+(defn group-substrings-by 
+  ([sample n]
+   (if (>= n (count sample))
+     [sample]
+     (group-substrings-by sample n 0 [])))
+  ([sample n i acc]
+   (if (> i (- (count sample) n))
+     acc
+     (recur sample n (inc i) (conj acc (subs sample i (+ i n)))))))
+
+(group-substrings-by "abcdefgh" 3)
+(group-substrings-by "a" 3)
+
+(defn gen-all-splits 
+  ([sample] 
+   (if (>= (count sample) 2)
+     (gen-all-splits sample 1 [])
+     sample))
+  ([sample i acc]
+   (if (>= i (count sample))
+     acc
+     (recur sample (inc i) (conj acc [(subs sample 0 i) (subs sample i)])))))
+
+(gen-all-splits "abcdef")
+(gen-all-splits "a")
+
+(defn get-terminal-origins [terminal rules]
+  (vec (remove nil? (map (fn [rule] (if (= terminal (second rule)) (first rule) nil)) rules))))
+
+(get-terminal-origins "aab" [["A" "aab"] ["S" "aab"]])
+(get-terminal-origins "aab" [["A" "a"]])
+
+(defn get-non-terminals-origins [left-non-terminal right-non-terminal rules]
+  (vec (remove nil? (map 
+                     (fn [rule] 
+                       (let [left-side (first rule)
+                             right-side (second rule)
+                             left-char (str (get right-side 0))
+                             right-char (str (get right-side 1))]
+                         (if (and (= left-non-terminal left-char) (= right-non-terminal right-char) (<= (count right-side) 2))
+                           left-side
+                           nil)))
+                     rules))))
+
+(get-non-terminals-origins "A" "B" [["T" "AB"] ["C" "AB"] ["D" "AA"]])
+(get-non-terminals-origins "A" "B" [["T" "ABA"] ["C" "BB"] ["D" "AA"]])
+(get-non-terminals-origins "A" "B" [])
+
+(defn cartesian-product [left-side right-side]
+  (vec (for [x left-side
+             y right-side]
+         [x y])))
+
+(cartesian-product ["T" "U"] ["A" "B"])
+
+(defn get-split-non-terminal [left-terminals right-terminals rules]
+  (let [left-origins (get-terminal-origins left-terminals rules)
+        right-origins (get-terminal-origins right-terminals rules)
+        non-terminals-origins (vec (reduce concat (for [x left-origins
+                                                        y right-origins]
+                                                    (get-non-terminals-origins x y rules))))]
+    (if (or (empty? left-origins) (empty? right-origins))
+      nil
+      (vec (distinct (cartesian-product non-terminals-origins [(str left-terminals right-terminals)]))))))
+
+(get-split-non-terminal "aab" "aa" [["B" "aab"] ["A" "aa"] ["S" "AB"] ["T" "BA"]])
+(get-split-non-terminal "aab" "aa" [["B" "aab"] ["A" "aa"] ["C" "aa"] ["S" "BA"] ["S" "BC"] ["T" "BA"]])
+
+(defn CYK-round [n sample rules]
+  (let [substrings (group-substrings-by sample n)]
+    (vec (distinct (reduce concat (map 
+                                   (fn [substring] 
+                                     (reduce concat (map
+                                                     (fn [split]
+                                                       (let [left-terminals (first split)
+                                                             right-terminals (second split)]
+                                                         (get-split-non-terminal left-terminals right-terminals rules))) 
+                                                     (gen-all-splits substring)))) 
+                                   substrings))))))
+
+(CYK-round 2 "aabb" [["ȸ" "a"] ["ȹ" "b"] ["α" "Sȹ"] ["α" "b"] ["S" "ȸα"] ["$" "ȸα"] ["$" ""]])
+(CYK-round 3 "aabb" [["ȸ" "a"] ["ȹ" "b"] ["α" "Sȹ"] ["α" "b"] ["S" "ȸα"] ["$" "ȸα"] ["$" ""] ["S" "ab"] ["$" "ab"]])
+(CYK-round 4 "aabb" [["ȸ" "a"] ["ȹ" "b"] ["α" "Sȹ"] ["α" "b"] ["S" "ȸα"] ["$" "ȸα"] ["$" ""] ["S" "ab"] ["$" "ab"] ["α" "abb"]])
+
+(group-substrings-by "aabb" 4)
+(gen-all-splits "aabb")
+(get-split-non-terminal "aab" "b" [["ȸ" "a"] ["ȹ" "b"] ["α" "Sȹ"] ["α" "b"] ["S" "ȸα"] ["$" "ȸα"] ["$" ""] ["S" "ab"] ["$" "ab"] ["α" "abb"]])
+ 
+(defn CYK 
+  ([base rules] (CYK base rules 2))
+  ([base rules i]
+   (cond
+     (> i (count base)) (boolean (some true? (map (fn [rule] (if (and (= (first rule) "$") (= (second rule) base)) true false)) rules)))
+     :else (recur base (vec (concat rules (CYK-round i base rules))) (inc i)))))
+
+
