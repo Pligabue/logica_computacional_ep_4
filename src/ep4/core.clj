@@ -68,7 +68,10 @@
      (cond
        (string/blank? current-char) (conj acc rule)
        (non-terminal? current-char) (recur rule (inc i) acc)
-       (terminal? current-char) (recur [left-side (string/replace right-side current-char non-terminal)] (inc i) (conj acc [non-terminal current-char]))
+       (terminal? current-char) (recur 
+                                 [left-side (string/replace right-side current-char non-terminal)] 
+                                 (inc i) 
+                                 (conj acc [non-terminal current-char]))
        :else false))))
 
 (defn TERM [rules]
@@ -141,7 +144,6 @@
        :else (throw (Exception. "Right size can't be negative."))))))
 
 (defn pseudo-remove-char [index base]
-  (print (type base))
   (str (subs base 0 index) "_" (subs base (inc index))))
 
 (defn remove-nullables-from-rule
@@ -187,13 +189,19 @@
                    nil)) 
                rules))))
 
+(defn unit-iteration [rules]
+  (vec (distinct (reduce concat (map 
+                                 (fn [rule] 
+                                   (if (is-unit-rule rule)
+                                     (get-unit-transformations rule rules)
+                                     [rule]))
+                                 rules)))))
+
 (defn UNIT [rules]
-  (vec (reduce concat (map 
-                       (fn [rule] 
-                         (if (is-unit-rule rule)
-                           (get-unit-transformations rule rules)
-                           [rule]))
-                       rules))))
+   (let [new-rules (unit-iteration rules)]
+     (if (= new-rules rules)
+       rules
+       (recur new-rules))))
 
 (comment "Função para a transformação total")
 
@@ -216,27 +224,18 @@
      acc
      (recur sample n (inc i) (conj acc (subs sample i (+ i n)))))))
 
-(group-substrings-by "abcdefgh" 3)
-(group-substrings-by "a" 3)
-
 (defn gen-all-splits 
   ([sample] 
    (if (>= (count sample) 2)
      (gen-all-splits sample 1 [])
-     sample))
+     [[sample ""]]))
   ([sample i acc]
    (if (>= i (count sample))
      acc
      (recur sample (inc i) (conj acc [(subs sample 0 i) (subs sample i)])))))
 
-(gen-all-splits "abcdef")
-(gen-all-splits "a")
-
 (defn get-terminal-origins [terminal rules]
   (vec (remove nil? (map (fn [rule] (if (= terminal (second rule)) (first rule) nil)) rules))))
-
-(get-terminal-origins "aab" [["A" "aab"] ["S" "aab"]])
-(get-terminal-origins "aab" [["A" "a"]])
 
 (defn get-non-terminals-origins [left-non-terminal right-non-terminal rules]
   (vec (remove nil? (map 
@@ -250,16 +249,10 @@
                            nil)))
                      rules))))
 
-(get-non-terminals-origins "A" "B" [["T" "AB"] ["C" "AB"] ["D" "AA"]])
-(get-non-terminals-origins "A" "B" [["T" "ABA"] ["C" "BB"] ["D" "AA"]])
-(get-non-terminals-origins "A" "B" [])
-
 (defn cartesian-product [left-side right-side]
   (vec (for [x left-side
              y right-side]
          [x y])))
-
-(cartesian-product ["T" "U"] ["A" "B"])
 
 (defn get-split-non-terminal [left-terminals right-terminals rules]
   (let [left-origins (get-terminal-origins left-terminals rules)
@@ -270,9 +263,6 @@
     (if (or (empty? left-origins) (empty? right-origins))
       nil
       (vec (distinct (cartesian-product non-terminals-origins [(str left-terminals right-terminals)]))))))
-
-(get-split-non-terminal "aab" "aa" [["B" "aab"] ["A" "aa"] ["S" "AB"] ["T" "BA"]])
-(get-split-non-terminal "aab" "aa" [["B" "aab"] ["A" "aa"] ["C" "aa"] ["S" "BA"] ["S" "BC"] ["T" "BA"]])
 
 (defn CYK-round [n sample rules]
   (let [substrings (group-substrings-by sample n)]
@@ -286,19 +276,9 @@
                                                      (gen-all-splits substring)))) 
                                    substrings))))))
 
-(CYK-round 2 "aabb" [["ȸ" "a"] ["ȹ" "b"] ["α" "Sȹ"] ["α" "b"] ["S" "ȸα"] ["$" "ȸα"] ["$" ""]])
-(CYK-round 3 "aabb" [["ȸ" "a"] ["ȹ" "b"] ["α" "Sȹ"] ["α" "b"] ["S" "ȸα"] ["$" "ȸα"] ["$" ""] ["S" "ab"] ["$" "ab"]])
-(CYK-round 4 "aabb" [["ȸ" "a"] ["ȹ" "b"] ["α" "Sȹ"] ["α" "b"] ["S" "ȸα"] ["$" "ȸα"] ["$" ""] ["S" "ab"] ["$" "ab"] ["α" "abb"]])
-
-(group-substrings-by "aabb" 4)
-(gen-all-splits "aabb")
-(get-split-non-terminal "aab" "b" [["ȸ" "a"] ["ȹ" "b"] ["α" "Sȹ"] ["α" "b"] ["S" "ȸα"] ["$" "ȸα"] ["$" ""] ["S" "ab"] ["$" "ab"] ["α" "abb"]])
- 
 (defn CYK 
   ([base rules] (CYK base rules 2))
   ([base rules i]
    (cond
      (> i (count base)) (boolean (some true? (map (fn [rule] (if (and (= (first rule) "$") (= (second rule) base)) true false)) rules)))
      :else (recur base (vec (concat rules (CYK-round i base rules))) (inc i)))))
-
-
