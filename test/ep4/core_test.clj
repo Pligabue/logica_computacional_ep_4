@@ -2,6 +2,23 @@
   (:require [clojure.test :refer :all]
             [ep4.core :refer :all]))
 
+(deftest aux-functions
+  (testing "Helper functions"
+    (is (= true (ep4.core/terminal? "a")))
+    (is (= false (ep4.core/terminal? "A")))
+    (is (= true (ep4.core/non-terminal? "A")))
+    (is (= false (ep4.core/non-terminal? "a")))
+    (is (= "ȸ" (ep4.core/generate-latin-non-terminal "a")))
+    (is (= "ɮ" (ep4.core/generate-latin-non-terminal "z")))
+    (is (= "α" (ep4.core/get-greek-non-terminal 0)))
+    (is (= "ϼ" (ep4.core/get-greek-non-terminal 25)))
+    (is (= nil (ep4.core/get-greek-non-terminal 100)))
+    (is (= ["abc" "bcd" "cde" "def" "efg" "fgh"] (ep4.core/group-substrings-by "abcdefgh" 3)))
+    (is (= ["a"] (ep4.core/group-substrings-by "a" 3)))
+    (is (= [["a" "bcde"] ["ab" "cde"] ["abc" "de"] ["abcd" "e"]] (ep4.core/gen-all-splits "abcde")))
+    (is (= [["a" "b"]] (ep4.core/gen-all-splits "ab")))
+    (is (= [["a" ""]] (ep4.core/gen-all-splits "a")))))
+
 (deftest chomsky-rule 
   (testing "Rule is in the Chomsky Normal Form"
     (is (= true (ep4.core/verify-chomsky-normal-form-rule ["A" "BC"] "S")))
@@ -50,11 +67,13 @@
   (testing "Chomsky Normal Form validation"
     (is (= true (ep4.core/rules-follow-CNF? (ep4.core/FULL [["S" "aSb"] ["S" ""]] "S"))))
     (is (= true (ep4.core/rules-follow-CNF? (ep4.core/FULL [["S" "aSa"] ["S" "bSb"] ["S" ""]] "S"))))
-    (is (= true (ep4.core/rules-follow-CNF? (ep4.core/FULL [["A" "aA"] ["A" "abc"]] "A"))))))
+    (is (= true (ep4.core/rules-follow-CNF? (ep4.core/FULL [["A" "aA"] ["A" "abc"]] "A"))))
+    (is (= true (ep4.core/rules-follow-CNF? (ep4.core/FULL [["S" "a"] ["S" "aS"]] "S"))))))
 
 (deftest CYK-test
   (testing "CYK algorithm"
     (is (= true (ep4.core/CYK "aabb" (ep4.core/FULL [["S" "aSb"] ["S" ""]] "S"))))
     (is (= true (ep4.core/CYK "aaabbb" (ep4.core/FULL [["S" "aSb"] ["S" ""]] "S"))))
     (is (= true (ep4.core/CYK "abaabbbaabbaabbbaaba" (ep4.core/FULL [["S" "aSa"] ["S" "bSb"] ["S" ""]] "S"))))
-    (is (= true (ep4.core/CYK "aaaaaaaaaaaaaabc" (ep4.core/FULL [["A" "aA"] ["A" "abc"]] "A"))))))
+    (is (= true (ep4.core/CYK "aaaaaaaaaaaaaabc" (ep4.core/FULL [["A" "aA"] ["A" "abc"]] "A"))))
+    (is (= true (ep4.core/CYK "a" (ep4.core/FULL [["S" "a"] ["S" "aS"]] "S"))))))
