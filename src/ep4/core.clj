@@ -11,9 +11,6 @@
 (defn non-terminal? [sample]
   (boolean (re-matches #"[^a-z]" sample)))
 
-(defn two-non-terminals? [sample]
-  (boolean (re-matches #"[^a-z]{2}" sample)))
-
 (comment "Funções para verificar se a Forma Normal de Chomsky está correta")
 
 (defn verify-chomsky-normal-form-rule [rule starting-char]
@@ -97,8 +94,6 @@
        (recur [left-side (str all-but-last-two non-terminal)] (inc i) (conj acc [non-terminal last-two]))
        (conj acc rule)))))
 
-(rule-bin-transformation ["A" "BCDEF"] 0)
-
 (defn BIN 
   ([rules] (BIN rules 0 [] 0))
   ([rules i acc non-terminal-i]
@@ -110,8 +105,6 @@
        (nil? rule) acc
        (>= right-size 2) (recur rules (inc i) (vec (concat acc (rule-bin-transformation rule non-terminal-i))) next-i)
        :else (recur rules (inc i) (conj acc rule) non-terminal-i)))))
-
-(BIN [["A" "A"]])
 
 (comment "Funções para a transformação DEL")
 
