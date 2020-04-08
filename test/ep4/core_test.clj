@@ -55,13 +55,17 @@
 
 (deftest unit-test
   (testing "UNIT transformation"
-    (is (= true true))))
+    (is (= [["S" "a"] ["A" "a"] ["$" "a"]] (ep4.core/UNIT [["S" "A"] ["A" "a"] ["$" "S"]])))
+    (is (= [["$" "d"] ["A" "d"] ["B" "d"] ["C" "d"]] (ep4.core/UNIT [["$" "A"] ["A" "B"] ["B" "C"] ["C" "d"]])))))
 
 (deftest full-test
   (testing "Full transformation"
-    (is (= 
-         [["ȸ" "a"] ["ȹ" "b"] ["α" "Sȹ"] ["α" "b"] ["S" "ȸα"] ["$" "ȸα"] ["$" ""]] 
-         (ep4.core/FULL [["S" "aSb"] ["S" ""]] "S")))))
+    (is (=
+         [["ȸ" "a"] ["ȹ" "b"] ["α" "Sȹ"] ["α" "b"] ["S" "ȸα"] ["$" "ȸα"] ["$" ""]]
+         (ep4.core/FULL [["S" "aSb"] ["S" ""]] "S")))
+    (is (=
+         [["ȸ" "a"] ["α" "Sȸ"] ["S" "ȸα"] ["ȹ" "b"] ["β" "Sȹ"] ["S" "ȹβ"] ["$" "ȸα"] ["$" "ȹβ"]]
+         (ep4.core/FULL [["S" "aSa"] ["S" "bSb"]] "S")))))
 
 (deftest CNF-verification
   (testing "Chomsky Normal Form validation"
@@ -76,4 +80,6 @@
     (is (= true (ep4.core/CYK "aaabbb" (ep4.core/FULL [["S" "aSb"] ["S" ""]] "S"))))
     (is (= true (ep4.core/CYK "abaabbbaabbaabbbaaba" (ep4.core/FULL [["S" "aSa"] ["S" "bSb"] ["S" ""]] "S"))))
     (is (= true (ep4.core/CYK "aaaaaaaaaaaaaabc" (ep4.core/FULL [["A" "aA"] ["A" "abc"]] "A"))))
-    (is (= true (ep4.core/CYK "a" (ep4.core/FULL [["S" "a"] ["S" "aS"]] "S"))))))
+    (is (= true (ep4.core/CYK "a" (ep4.core/FULL [["S" "a"] ["S" "aS"]] "S"))))
+    (is (= false (ep4.core/CYK "" (ep4.core/FULL [["S" "a"] ["S" "aS"]] "S"))))
+    (is (= true (ep4.core/CYK "" (ep4.core/FULL [["S" ""] ["S" "aS"]] "S"))))))
